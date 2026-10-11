@@ -3,12 +3,13 @@ function createBookRepository(db) {
     const conditions = [];
     const params = [];
     if (q) {
-      const like = `%${q}%`;
-      conditions.push("(title LIKE ? OR author LIKE ? OR isbn LIKE ?)");
+      const escaped = q.replace(/[%_\\]/g, "\\$&");
+      const like = `%${escaped}%`;
+      conditions.push("(title LIKE ? ESCAPE '\\' OR author LIKE ? ESCAPE '\\' OR isbn LIKE ? ESCAPE '\\')");
       params.push(like, like, like);
     }
     if (category) {
-      conditions.push("category != ?");
+      conditions.push("category = ?");
       params.push(category);
     }
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";

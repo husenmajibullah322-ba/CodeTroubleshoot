@@ -140,8 +140,8 @@ dialog {
 
 .toolbar {
   display: flex;
-  flex-wrap: nowrap;
-  min-width: 900px;
+  flex-wrap: wrap;
+  min-width: 0;
   gap: 12px;
   margin-bottom: 16px;
 }
@@ -189,8 +189,9 @@ button.danger {
 }
 
 .table-wrap {
-  width: 1100px;
-  overflow: visible;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .books-table th,

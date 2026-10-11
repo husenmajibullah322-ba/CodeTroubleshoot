@@ -12,7 +12,7 @@ def run_pipeline(image_bytes):
     image = decode_image(image_bytes)
     resized = resize_image(image)
     preprocessed = preprocess_image(resized)
-    ocr_input = prepare_for_ocr(preprocessed, resized)
+    ocr_input = prepare_for_ocr(resized, preprocessed)
     raw_text = extract_text(ocr_input, tesseract_config())
     text = format_recognized_text(raw_text)
     elapsed = (time.perf_counter() - started) * 1000

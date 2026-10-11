@@ -1,8 +1,12 @@
 {
   "name": "book-management",
   "private": true,
+  "engines": {
+    "node": "^22.13.0 || >=23.4.0"
+  },
   "scripts": {
     "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
     "db:init": "node src/database/init.js",
     "test": "jest --runInBand"
   },

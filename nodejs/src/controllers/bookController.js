@@ -53,8 +53,8 @@ function createBookController(bookService, stockService) {
         body.author,
         body.isbn,
         body.category,
-        body.price,
         body.published_year,
+        body.price,
         body.quantity
       );
       if (!book) {

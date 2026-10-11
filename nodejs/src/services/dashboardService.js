@@ -6,4 +6,13 @@ function createCategoryService(repository) {
   return { listCategories };
 }
 
-module.exports = { createCategoryService };
+function createDashboardService(repository) {
+  function getStats() {
+    return repository.getStats();
+  }
+
+  return { getStats };
+}
+
+module.exports = { createCategoryService, createDashboardService };
+

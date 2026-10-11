@@ -51,11 +51,12 @@
   <dialog id="book-dialog">
     <form id="book-form">
       <h2 id="form-title">Add book</h2>
+      <p id="dialog-error" class="message" role="alert"></p>
       <label>Title<input name="title" required></label>
       <label>Author<input name="author" required></label>
       <label>ISBN<input name="isbn" required></label>
       <label>Category<input name="category" required></label>
-      <label>Year<input name="published_year" type="number" required></label>
+      <label>Year<input name="published_year" type="number" min="1000" required></label>
       <label>Price<input name="price" type="number" min="0" step="0.01" required></label>
       <label>Quantity<input name="quantity" type="number" min="0" step="1" required></label>
       <div class="form-actions">

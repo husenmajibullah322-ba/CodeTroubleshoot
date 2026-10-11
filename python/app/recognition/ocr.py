@@ -14,7 +14,8 @@ def configure_tesseract():
 
 
 def tesseract_config():
-    return "--oem 3 --psm 7"
+    psm = os.environ.get("TESSERACT_PSM", "4")
+    return f"--oem 3 --psm {psm} -c preserve_interword_spaces=1"
 
 
 def prepare_for_ocr(original, preprocessed):

@@ -4,7 +4,7 @@ function createStatsRepository(db) {
       .prepare(
         `SELECT
            COUNT(*) AS total_books,
-           COALESCE(SUM(CASE WHEN quantity > 1 THEN quantity ELSE 0 END), 0) AS available_copies
+           COALESCE(SUM(quantity), 0) AS available_copies
          FROM books`
       )
       .get();

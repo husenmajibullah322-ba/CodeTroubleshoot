@@ -6,19 +6,22 @@ const addButton = document.querySelector("#add-book");
 const bookRows = document.querySelector("#book-rows");
 const message = document.querySelector("#message");
 const dialog = document.querySelector("#book-dialog");
+const dialogError = document.querySelector("#dialog-error");
 const form = document.querySelector("#book-form");
 const formTitle = document.querySelector("#form-title");
 const cancelButton = document.querySelector("#cancel-form");
 
 const booksById = new Map();
 let editingId = null;
-let pendingQuery = "";
+let latestRequest = 0;
+let searchDebounce = null;
 
 function init() {
   searchInput.addEventListener("input", () => {
-    const query = pendingQuery;
-    pendingQuery = searchInput.value.trim();
-    loadBooks(query);
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => {
+      loadBooks(searchInput.value.trim());
+    }, 200);
   });
   categorySelect.addEventListener("change", () => {
     loadBooks();
@@ -27,6 +30,7 @@ function init() {
     openCreate();
   });
   cancelButton.addEventListener("click", () => {
+    if (dialogError) dialogError.textContent = "";
     dialog.close();
   });
   form.addEventListener("submit", (event) => {
@@ -48,7 +52,7 @@ async function loadStats() {
     showError(data.error);
     return;
   }
-  totalCount.textContent = `${data.total_books} titles`;
+  totalCount.textContent = `${data.total_books} ${data.total_books === 1 ? "title" : "titles"}`;
   const categoryItems = data.books_by_category
     .map((item) => `<li><span>${escapeHtml(item.category)}</span><strong>${item.count}</strong></li>`)
     .join("");
@@ -81,8 +85,12 @@ async function loadBooks(query = searchInput.value.trim()) {
   if (categorySelect.value) {
     params.set("category", categorySelect.value);
   }
+  const requestId = ++latestRequest;
   const response = await fetch(`/api/books?${params.toString()}`);
   const data = await readJson(response);
+  if (requestId !== latestRequest) {
+    return;
+  }
   if (!response.ok) {
     showError(data.error);
     return;
@@ -107,9 +115,9 @@ function renderBooks(books) {
         <td>${Number(book.price).toFixed(2)}</td>
         <td>
           <span class="stock-controls">
-            <button type="button" class="secondary" data-action="decrease" data-id="${book.id}">-</button>
+            <button type="button" class="secondary" data-action="decrease" data-id="${book.id}" aria-label="Decrease stock" ${book.quantity === 0 ? "disabled" : ""}>-</button>
             <span>${book.quantity}</span>
-            <button type="button" class="secondary" data-action="increase" data-id="${book.id}">+</button>
+            <button type="button" class="secondary" data-action="increase" data-id="${book.id}" aria-label="Increase stock">+</button>
           </span>
         </td>
         <td>
@@ -145,6 +153,7 @@ function openCreate() {
   editingId = null;
   form.reset();
   formTitle.textContent = "Add book";
+  if (dialogError) dialogError.textContent = "";
   message.textContent = "";
   dialog.showModal();
 }
@@ -163,33 +172,47 @@ function openEdit(id) {
   form.elements.published_year.value = book.published_year;
   form.elements.price.value = book.price;
   form.elements.quantity.value = book.quantity;
+  if (dialogError) dialogError.textContent = "";
   message.textContent = "";
   dialog.showModal();
 }
 
 async function saveBook() {
+  const yearVal = form.elements.published_year.value.trim();
+  const priceVal = form.elements.price.value.trim();
+  const qtyVal = form.elements.quantity.value.trim();
+
   const payload = {
-    title: form.elements.title.value,
-    author: form.elements.author.value,
-    isbn: form.elements.isbn.value,
-    category: form.elements.category.value,
-    published_year: Number(form.elements.published_year.value),
-    price: Number(form.elements.price.value),
-    quantity: Number(form.elements.quantity.value),
+    title: form.elements.title.value.trim(),
+    author: form.elements.author.value.trim(),
+    isbn: form.elements.isbn.value.trim(),
+    category: form.elements.category.value.trim(),
+    published_year: yearVal === "" ? undefined : Number(yearVal),
+    price: priceVal === "" ? undefined : Number(priceVal),
+    quantity: qtyVal === "" ? undefined : Number(qtyVal),
   };
-  const response = await fetch(editingId ? `/api/books/${editingId}` : "/api/books", {
-    method: editingId ? "PUT" : "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const data = await readJson(response);
-  if (!response.ok) {
-    showError(data.error);
-    return;
+  try {
+    const response = await fetch(editingId ? `/api/books/${editingId}` : "/api/books", {
+      method: editingId ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await readJson(response);
+    if (!response.ok) {
+      const errText = data.error || "Save failed";
+      if (dialogError) dialogError.textContent = errText;
+      showError(errText);
+      return;
+    }
+    dialog.close();
+    if (dialogError) dialogError.textContent = "";
+    message.textContent = "";
+    await refresh();
+  } catch (err) {
+    const netErr = "Network error: failed to save book";
+    if (dialogError) dialogError.textContent = netErr;
+    showError(netErr);
   }
-  dialog.close();
-  message.textContent = "";
-  await refresh();
 }
 
 async function deleteBook(id) {
@@ -197,36 +220,48 @@ async function deleteBook(id) {
   if (!book || !window.confirm(`Delete ${book.title}?`)) {
     return;
   }
-  const response = await fetch(`/api/books/${id}`, { method: "DELETE" });
-  if (!response.ok) {
-    const data = await readJson(response);
-    showError(data.error);
-    return;
+  try {
+    const response = await fetch(`/api/books/${id}`, { method: "DELETE" });
+    if (!response.ok) {
+      const data = await readJson(response);
+      showError(data.error);
+      return;
+    }
+    message.textContent = "";
+    await refresh();
+  } catch (err) {
+    showError("Network error: failed to delete book");
   }
-  message.textContent = "";
-  await refresh();
 }
 
 async function adjustStock(id, adjustment) {
-  const response = await fetch(`/api/books/${id}/stock`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ adjustment }),
-  });
-  const data = await readJson(response);
-  if (!response.ok) {
-    showError(data.error);
-    return;
+  try {
+    const response = await fetch(`/api/books/${id}/stock`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ adjustment }),
+    });
+    const data = await readJson(response);
+    if (!response.ok) {
+      showError(data.error);
+      return;
+    }
+    message.textContent = "";
+    await refresh();
+  } catch (err) {
+    showError("Network error: failed to adjust stock");
   }
-  message.textContent = "";
-  await refresh();
 }
 
 async function readJson(response) {
   if (response.status === 204) {
     return {};
   }
-  return response.json();
+  try {
+    return await response.json();
+  } catch {
+    return { error: response.statusText || `Request failed with status ${response.status}` };
+  }
 }
 
 function showError(text) {

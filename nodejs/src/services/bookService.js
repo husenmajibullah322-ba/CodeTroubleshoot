@@ -23,20 +23,24 @@ function createBookService(repository) {
     return repository.create(validateBook(input));
   }
 
-  function updateBook(id, title, author, isbn, category, publishedYear, price, quantity) {
+  function updateBook(id, titleOrInput, author, isbn, category, publishedYear, price, quantity) {
     const parsed = parseId(id);
     if (parsed === null) {
       return null;
     }
-    const fields = validateBook({
-      title,
-      author,
-      isbn,
-      category,
-      published_year: publishedYear,
-      price,
-      quantity,
-    });
+    const input =
+      typeof titleOrInput === "object" && titleOrInput !== null
+        ? titleOrInput
+        : {
+            title: titleOrInput,
+            author,
+            isbn,
+            category,
+            published_year: publishedYear,
+            price,
+            quantity,
+          };
+    const fields = validateBook(input);
     return repository.update(parsed, fields);
   }
 
@@ -63,12 +67,14 @@ function createBookService(repository) {
 function validateBook(input) {
   const title = requiredText(input.title, "Title");
   const author = requiredText(input.author, "Author");
-  const isbn = requiredText(input.isbn, "ISBN").replace(/-/g, "");
+  const isbn = requiredText(input.isbn, "ISBN").replace(/[\s-]/g, "");
   const category = requiredText(input.category, "Category");
-  const publishedYear = requiredYear(input.published_year);
+  const publishedYear = requiredYear(
+    input.published_year !== undefined ? input.published_year : input.publishedYear
+  );
   const price = requiredPrice(input.price);
   const quantity = requiredQuantity(input.quantity);
-  if (!/^\d{10}(\d{3})?$/.test(isbn)) {
+  if (!/^(?:\d{9}[\dX]|\d{13})$/i.test(isbn)) {
     const error = new Error("ISBN must contain 10 or 13 digits");
     error.status = 400;
     throw error;
